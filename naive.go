@@ -1,23 +1,40 @@
 package batching
 
-func NewNaive(runner func([][]byte), data <-chan []byte, opts ...Option) error {
+import (
+	"sync"
+
+	"github.com/rai-project/dlframework/steps"
+)
+
+type batch struct {
+	sync.WaitGroup
+}
+
+func NewNaive(runner func([]steps.IDer), data <-chan steps.IDer, opts ...Option) (*batch, error) {
 	options := NewOptions(opts...)
-	buf := [][]byte{}
+	buf := []steps.IDer{}
+	btch := new(batch)
 	for {
 		select {
 		case data, ok := <-data:
 			if !ok {
-				return nil
+				return btch, nil
 			}
 			buf = append(buf, data)
 
 			if len(buf) == options.batchsize {
-				runner(buf)
-				buf = [][]byte{}
+				btch.Add(1)
+				tmp := make([]steps.IDer, len(buf))
+				copy(tmp, buf)
+				go func() {
+					runner(tmp)
+					btch.Done()
+				}()
+				buf = []steps.IDer{}
 			}
 		case <-options.ctx.Done():
-			return nil
+			return btch, nil
 		}
 	}
-	return nil
+	return btch, nil
 }
