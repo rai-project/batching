@@ -10,6 +10,7 @@ func NewNaive(runner func([][]byte), data <-chan []byte, opts ...Option) error {
 				return nil
 			}
 			buf = append(buf, data)
+
 			if len(buf) == options.batchsize {
 				runner(buf)
 				buf = [][]byte{}
